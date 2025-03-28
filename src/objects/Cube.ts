@@ -10,13 +10,13 @@ export class Cube {
     const geometry = new THREE.BoxGeometry(1, 1, 1);
     const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
     this.mesh = new THREE.Mesh(geometry, material);
-    this.mesh.position.set(-2, 5, 0); // Position initiale en hauteur
+    this.mesh.position.set(-2, 0, 0); // Position initiale en hauteur
     scene.add(this.mesh);
 
     // Création du corps physique pour le cube
     const shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)); // Taille du cube physique
     this.physicsBody = new CANNON.Body({
-      mass: 1, // La masse du cube (le cube tombe sous l'effet de la gravité)
+      mass: 1000, // La masse du cube (le cube tombe sous l'effet de la gravité)
       position: new CANNON.Vec3(-2, 5, 0), // Position initiale
     });
     this.physicsBody.addShape(shape);

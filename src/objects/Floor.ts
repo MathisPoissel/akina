@@ -3,7 +3,7 @@ import * as CANNON from "cannon-es";
 
 export class Floor {
   public mesh!: THREE.Mesh;
-  private size: number = 100;
+  private size: number = 10;
   private segments: number = 128;
 
   constructor(scene: THREE.Scene, physicsWorld: CANNON.World) {
@@ -33,7 +33,7 @@ export class Floor {
     // Création du mesh et configuration
     this.mesh = new THREE.Mesh(geometry, floorTexture);
     this.mesh.receiveShadow = true;
-    this.mesh.position.y = -0.5; // Positionnez le sol légèrement en dessous de l'origine
+    this.mesh.position.y = 0.05; // Positionnez le sol légèrement en dessous de l'origine
     this.mesh.rotation.x = -Math.PI / 2;
 
     // Ajouter à la scène

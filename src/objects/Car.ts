@@ -23,22 +23,20 @@ export class Car {
   public chassisBody: CANNON.Body | null = null;
   public vehicle: CANNON.RaycastVehicle | null = null;
 
-  // Controls state
-  private forwardVelocity: number = 0;
-  private rightVelocity: number = 0;
-  private maxSteerValue: number = 0.5;
-  private maxForce: number = 8000; // Reduced to prevent flying
-  private brakeForce: number = 50;
+  // Paramètres configurables
+  private maxSteerValue: number = 0.7; // Valeur de braquage maximale
+  private maxForce: number = 30000; // Force maximale
+  private brakeForce: number = 50; // Force de freinage
 
   // Current speed for display
   public currentSpeed: number = 0;
 
-  // Wheel positions (ajustez ces valeurs selon les besoins)
+  // Wheel positions
   private wheelPositions = [
-    { x: 0.35, y: -0.045, z: 0.6 }, // Front left (ajustez selon vos besoins)
-    { x: -0.35, y: -0.045, z: 0.6 }, // Front right (ajustez selon vos besoins)
-    { x: 0.35, y: -0.045, z: -0.5 }, // Back left (ajustez selon vos besoins)
-    { x: -0.35, y: -0.045, z: -0.5 }, // Back right (ajustez selon vos besoins)
+    { x: 0.35, y: -0.17, z: 0.6 }, // Front left
+    { x: -0.35, y: -0.17, z: 0.6 }, // Front right
+    { x: 0.35, y: -0.17, z: -0.5 }, // Back left
+    { x: -0.35, y: -0.17, z: -0.5 }, // Back right
   ];
 
   constructor(scene: THREE.Scene, physicsWorld: CANNON.World) {
@@ -52,7 +50,15 @@ export class Car {
         this.model = gltf.scene;
         this.model.scale.set(0.005, 0.005, 0.005);
         this.pivot.add(this.model);
-        this.model.position.set(0, -0.2, 0);
+        this.model.position.set(0, -0.25, 0);
+
+        // Activer les ombres pour le modèle de la voiture
+        this.model.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            child.castShadow = true; // La voiture projette des ombres
+            child.receiveShadow = true; // La voiture reçoit des ombres
+          }
+        });
 
         // Debug: Display object names
         this.model.traverse((child) => {
@@ -118,6 +124,9 @@ export class Car {
           this.chassisBody.velocity.set(0, 0, 0);
           this.chassisBody.angularVelocity.set(0, 0, 0);
         }
+
+        // Create headlights
+        this.createHeadlights();
       },
       (xhr) => {
         console.log(`${(xhr.loaded / xhr.total) * 100}% loaded`);
@@ -220,63 +229,76 @@ export class Car {
   private setupPhysics(physicsWorld: CANNON.World): void {
     if (!this.model) return;
 
-    // Create chassis body from model bounding box
-    const box = new THREE.Box3().setFromObject(this.model);
-    const size = new THREE.Vector3();
-    box.getSize(size);
+    // // Récupérer le mesh de la voiture
+    // const carMesh = this.model.getObjectByName(
+    //   "InitialDCar_Mat_InitialDCar_0"
+    // ) as THREE.Mesh;
 
-    // Reduce the size a bit to make the car more stable
-    const halfExtents = new CANNON.Vec3(
-      (size.x / 2) * 0.8,
-      (size.y / 2) * 0.6,
-      (size.z / 2) * 0.8
-    );
+    // // Créer une forme de châssis à partir de la géométrie du mesh
+    // const geometry = carMesh.geometry as THREE.BufferGeometry;
+    // const vertices = geometry.attributes.position.array;
 
-    const chassisShape = new CANNON.Box(halfExtents);
-    const mass = 1000; // Reduced mass for stability
+    // // Appliquer l'échelle au mesh
+    // const scaleFactor = 0.005;
+    // const scaledVertices = new Float32Array(vertices.length);
+    // for (let i = 0; i < vertices.length; i++) {
+    //   scaledVertices[i] = vertices[i] * scaleFactor; // Appliquer l'échelle
+    // }
+
+    // const indices = geometry.index ? geometry.index.array : undefined;
+
+    // // Créer le mesh de collision
+    // const chassisShape = new CANNON.Trimesh(
+    //   Array.from(scaledVertices),
+    //   indices ? Array.from(indices) : [] // Fallback to an empty array if indices is undefined
+    // );
+
+    const chassisShape = new CANNON.Box(new CANNON.Vec3(0.38, 0.1, 0.9));
+
+    // Créer le corps physique
+    const mass = 3000; // Masse réduite pour la stabilité
     this.chassisBody = new CANNON.Body({ mass: mass });
     this.chassisBody.addShape(chassisShape);
 
-    // Position the chassis above the ground
+    // Positionner le châssis au-dessus du sol
     this.chassisBody.position.set(
       this.pivot.position.x,
-      this.pivot.position.y + halfExtents.y + 0.5,
+      this.pivot.position.y + 1, // Ajustez la position selon vos besoins
       this.pivot.position.z
     );
 
-    // Add damping to reduce bouncing and increase stability
-    this.chassisBody.linearDamping = 0.1;
-    this.chassisBody.angularDamping = 0.1;
+    // Ajouter un amortissement pour réduire les rebonds et augmenter la stabilité
+    this.chassisBody.linearDamping = 0.5; // Amortissement linéaire (réduction de la vitesse)
+    this.chassisBody.angularDamping = 0.5; // Amortissement angulaire (réduction de la rotation)
 
     physicsWorld.addBody(this.chassisBody);
 
-    // Create vehicle
+    // Créer le véhicule
     this.vehicle = new CANNON.RaycastVehicle({
       chassisBody: this.chassisBody,
-      indexRightAxis: 0, // X axis
-      indexUpAxis: 1, // Y axis (verticale)
-      indexForwardAxis: 2, // Z axis (avant)
+      indexRightAxis: 0, // Axe X
+      indexUpAxis: 1, // Axe Y (vertical)
+      indexForwardAxis: 2, // Axe Z (avant)
     });
   }
-
   private setupWheels(physicsWorld: CANNON.World): void {
     if (!this.vehicle) return;
 
     // Wheel options (ajustez le radius selon vos besoins)
     const wheelOptions = {
-      radius: 0.3, // Réduisez cette valeur pour correspondre à l'échelle correcte
+      radius: 0.19, // Réduisez cette valeur pour correspondre à l'échelle correcte
       directionLocal: new CANNON.Vec3(0, -1, 0), // Down direction
-      suspensionStiffness: 25,
-      suspensionRestLength: 0.02,
-      frictionSlip: 2,
-      dampingRelaxation: 2.5,
+      suspensionStiffness: 23,
+      suspensionRestLength: 0.1,
+      frictionSlip: 1.5,
+      dampingRelaxation: 10,
       dampingCompression: 2.5,
-      maxSuspensionForce: 50000,
+      maxSuspensionForce: 80000,
       rollInfluence: 0.05,
       axleLocal: new CANNON.Vec3(1, 0, 0),
       chassisConnectionPointLocal: new CANNON.Vec3(0, 0, 0),
-      maxSuspensionTravel: 0.3,
-      customSlidingRotationalSpeed: -30,
+      maxSuspensionTravel: 5,
+      customSlidingRotationalSpeed: 0,
       useCustomSlidingRotationalSpeed: true,
     };
 
@@ -363,16 +385,6 @@ export class Car {
     this.updateWheelVisuals();
   }
 
-  // Reset car position if it flips or falls off
-  private resetCar(): void {
-    if (!this.chassisBody) return;
-
-    this.chassisBody.position.set(0, 1, 0);
-    this.chassisBody.quaternion.setFromEuler(0, 0, 0);
-    this.chassisBody.velocity.set(0, 0, 0);
-    this.chassisBody.angularVelocity.set(0, 0, 0);
-  }
-
   // Update wheel visuals based on physics
   private updateWheelVisuals(): void {
     if (!this.vehicle) return;
@@ -409,8 +421,95 @@ export class Car {
         // Only front wheels
         const pivot = pivots[i];
         if (pivot) {
-          pivot.rotation.y = this.rightVelocity; // Apply steering angle
+          // Interpoler la rotation pour un mouvement plus fluide
+          const targetSteeringAngle = this.vehicle.wheelInfos[i].steering; // Utiliser la valeur de braquage
+          pivot.rotation.y += (targetSteeringAngle - pivot.rotation.y) * 0.1; // Interpolation
         }
+      }
+    }
+  }
+
+  // Méthode pour ajuster la vitesse maximale
+  public setMaxSpeed(speed: number): void {
+    this.maxSpeed = speed;
+  }
+
+  // Méthode pour ajuster le rayon de braquage
+  public setTurnRadius(radius: number): void {
+    this.turnRadius = radius;
+  }
+
+  // Méthode pour obtenir la vitesse actuelle
+  public getCurrentSpeed(): number {
+    return this.currentSpeed;
+  }
+
+  private createHeadlights(): void {
+    // Créer une lumière ponctuelle pour le phare gauche (SpotLight)
+    const leftHeadlight = new THREE.SpotLight(
+      0xffffff,
+      4,
+      10,
+      Math.PI / 4,
+      0.5,
+      2
+    );
+    leftHeadlight.position.set(0.25, 0.2, 0.85); // Positionner le phare gauche
+    leftHeadlight.castShadow = true; // Activer l'ombre
+    this.pivot.add(leftHeadlight); // Ajouter à la voiture
+
+    // Créer une lumière directionnelle pour la cible du phare gauche
+    const leftTarget = new THREE.Object3D();
+    leftTarget.position.set(0.25, 0, 2); // Position initiale de la cible (avant de la voiture)
+    this.pivot.add(leftTarget); // Ajouter la cible à la voiture
+    leftHeadlight.target = leftTarget; // Associer le phare gauche à la cible
+
+    // Créer une lumière ponctuelle pour le phare droit (SpotLight)
+    const rightHeadlight = new THREE.SpotLight(
+      0xffffff,
+      4,
+      10,
+      Math.PI / 4,
+      0.5,
+      2
+    );
+    rightHeadlight.position.set(-0.25, 0.2, 0.85); // Positionner le phare droit
+    rightHeadlight.castShadow = true; // Activer l'ombre
+    this.pivot.add(rightHeadlight); // Ajouter à la voiture
+
+    // Créer une lumière directionnelle pour la cible du phare droit
+    const rightTarget = new THREE.Object3D();
+    rightTarget.position.set(-0.25, 0, 2); // Position initiale de la cible (avant de la voiture)
+    this.pivot.add(rightTarget); // Ajouter la cible à la voiture
+    rightHeadlight.target = rightTarget; // Associer le phare droit à la cible
+  }
+
+  private updateHeadlights(): void {
+    if (!this.chassisBody) return;
+
+    // Récupérer la direction actuelle du véhicule
+    const forward = new THREE.Vector3(0, 0, 1); // Vecteur directionnel de la voiture (vers l'avant)
+    const worldDirection = new THREE.Vector3();
+
+    // Récupérer la direction globale de la voiture
+    this.pivot.getWorldDirection(worldDirection);
+
+    // Mettre à jour les cibles des phares pour les orienter en fonction de la direction de la voiture
+    if (this.pivot && this.pivot.children) {
+      // Mettre à jour la position de la cible du phare gauche
+      if (this.pivot.children[1] && this.pivot.children[1].target) {
+        this.pivot.children[1].target.position
+          .copy(worldDirection)
+          .multiplyScalar(2)
+          .add(this.pivot.position);
+      }
+
+      // Mettre à jour la position de la cible du phare droit
+      if (this.pivot.children[2] && this.pivot.children[2].target) {
+        this.pivot.children[2].target.position
+          .copy(worldDirection)
+          .multiplyScalar(2)
+          .add(this.pivot.position);
       }
     }
   }

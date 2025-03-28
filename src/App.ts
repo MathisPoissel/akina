@@ -7,6 +7,8 @@ import { Car } from "./objects/Car";
 import { Floor } from "./objects/Floor";
 import { Cube } from "./objects/Cube";
 import { CarControls } from "./controls/CarControls";
+import { Ramp } from "./objects/Ramp";
+import { RoadSegment } from "./objects/Roads/RoadSegment";
 
 interface CameraFollowParams {
   offsetX: number;
@@ -30,6 +32,7 @@ export class App {
   private floor!: Floor;
   private cube!: Cube;
   private carControls!: CarControls;
+  private roadSegment!: RoadSegment;
 
   // Paramètres pour le suivi de la caméra
   private cameraParams: CameraFollowParams = {
@@ -52,6 +55,14 @@ export class App {
       color: 0xff0000,
     });
 
+    const debugGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const debugMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      wireframe: true,
+    });
+    const debugMesh = new THREE.Mesh(debugGeometry, debugMaterial);
+    this.scene.add(debugMesh);
+
     this.camera = new THREE.PerspectiveCamera(
       75,
       window.innerWidth / window.innerHeight,
@@ -62,15 +73,14 @@ export class App {
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.shadowMap.enabled = true;
     document.body.appendChild(this.renderer.domElement);
 
     const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-    const directional = new THREE.DirectionalLight(0xffffff, 1);
-    directional.position.set(5, 5, 5);
-    this.scene.add(ambient, directional);
+    this.scene.add(ambient);
 
     // Création du sol
-    this.floor = new Floor(this.scene, this.physicsWorld);
+    //this.floor = new Floor(this.scene, this.physicsWorld);
 
     // Création du cube pour test
     this.cube = new Cube(this.scene, this.physicsWorld);
@@ -78,6 +88,32 @@ export class App {
     // Initialisation de la voiture et de ses contrôles
     this.car = new Car(this.scene, this.physicsWorld);
     this.carControls = new CarControls(this.car);
+
+    this.roadSegment = new RoadSegment(
+      this.scene,
+      this.physicsWorld,
+      new THREE.Vector3(0, -2, 0)
+    );
+
+    this.roadSegment = new RoadSegment(
+      this.scene,
+      this.physicsWorld,
+      new THREE.Vector3(0, -2, 20)
+    );
+
+    // Création de la rampe
+    const rampPosition = new THREE.Vector3(0, -1.5, 10);
+    const rampWidth = 5;
+    const rampHeight = 0.5;
+    const rampDepth = 10;
+    const ramp = new Ramp(
+      this.scene,
+      this.physicsWorld,
+      rampPosition,
+      rampWidth,
+      rampHeight,
+      rampDepth
+    );
 
     // Stats et GUI
     this.stats = new Stats();
@@ -165,7 +201,7 @@ export class App {
     this.physicsWorld.gravity.set(0, -9.81, 0);
 
     // Configuration de la détection des collisions
-    this.physicsWorld.broadphase = new CANNON.NaiveBroadphase();
+    this.physicsWorld.broadphase = new CANNON.SAPBroadphase(this.physicsWorld);
 
     // Configure solver parameters for better stability
     // These settings help with the car physics stability
