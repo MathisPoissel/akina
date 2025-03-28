@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import Stats from "stats.js";
+import * as CANNON from "cannon-es";
 import GUI from "lil-gui";
+import CannonDebugger from "cannon-es-debugger";
 import { Car } from "./objects/Car";
 import { Floor } from "./objects/Floor";
 import { Cube } from "./objects/Cube";
@@ -15,12 +17,14 @@ interface CameraFollowParams {
 }
 
 export class App {
+  private physicsWorld!: CANNON.World;
   private scene!: THREE.Scene;
   private camera!: THREE.PerspectiveCamera;
   private renderer!: THREE.WebGLRenderer;
   private stats!: Stats;
   private gui!: GUI;
   private clock: THREE.Clock = new THREE.Clock();
+  private cannonDebugger: any;
 
   private car!: Car;
   private floor!: Floor;
@@ -41,6 +45,13 @@ export class App {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x202020);
 
+    this.initPhysics();
+
+    // Création du debugger après l'initialisation du physicsWorld
+    this.cannonDebugger = CannonDebugger(this.scene, this.physicsWorld, {
+      color: 0xff0000,
+    });
+
     this.camera = new THREE.PerspectiveCamera(
       75,
       window.innerWidth / window.innerHeight,
@@ -59,13 +70,13 @@ export class App {
     this.scene.add(ambient, directional);
 
     // Création du sol
-    this.floor = new Floor(this.scene);
+    this.floor = new Floor(this.scene, this.physicsWorld);
 
-    // Création du cube (l'argument physicsWorld a été retiré)
-    this.cube = new Cube(this.scene);
+    // Création du cube pour test
+    this.cube = new Cube(this.scene, this.physicsWorld);
 
-    // Voiture et ses contrôles
-    this.car = new Car(this.scene);
+    // Initialisation de la voiture et de ses contrôles
+    this.car = new Car(this.scene, this.physicsWorld);
     this.carControls = new CarControls(this.car);
 
     // Stats et GUI
@@ -94,8 +105,7 @@ export class App {
     cameraFolder.open();
 
     window.addEventListener("resize", this.onWindowResize.bind(this));
-
-    // Lancement de l’animation
+    // Lancement de l'animation
     this.animate();
   }
 
@@ -105,8 +115,21 @@ export class App {
 
     const delta = this.clock.getDelta();
 
+    // Mise à jour de la simulation physique
+    const fixedTimeStep = 1.0 / 60.0;
+    const maxSubSteps = 3;
+    this.physicsWorld.step(fixedTimeStep, delta, maxSubSteps);
+
+    // Met à jour le debugger pour afficher les hitboxes
+    if (this.cannonDebugger) {
+      this.cannonDebugger.update();
+    }
+
     // Mise à jour des contrôles de la voiture
     this.carControls.update(delta);
+
+    // Mise à jour de la position et rotation de la voiture
+    this.car.update();
 
     // Suivi de la caméra
     if (this.car.pivot) {
@@ -130,10 +153,25 @@ export class App {
       lookAtTarget.y += this.cameraParams.lookAtOffsetY;
       this.camera.lookAt(lookAtTarget);
     }
+    this.cube.update();
 
     this.renderer.render(this.scene, this.camera);
     this.stats.end();
   };
+
+  private initPhysics() {
+    // Création du monde physique
+    this.physicsWorld = new CANNON.World();
+    this.physicsWorld.gravity.set(0, -9.81, 0);
+
+    // Configuration de la détection des collisions
+    this.physicsWorld.broadphase = new CANNON.NaiveBroadphase();
+
+    // Configure solver parameters for better stability
+    // These settings help with the car physics stability
+    this.physicsWorld.defaultContactMaterial.friction = 0.3;
+    this.physicsWorld.defaultContactMaterial.restitution = 0.1;
+  }
 
   private onWindowResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
