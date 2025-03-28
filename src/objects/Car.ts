@@ -24,7 +24,7 @@ export class Car {
     scene.add(this.pivot);
 
     this.loader.load(
-      "./src/public/models/gltf/car/car.gltf",
+      "./public/models/gltf/car/car.gltf",
       (gltf: GLTF) => {
         this.model = gltf.scene;
         this.model.scale.set(0.005, 0.005, 0.005);
