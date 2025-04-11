@@ -214,24 +214,24 @@ export class App {
 
       this.physicsWorld.addBody(body);
 
-      // ✅ Visualiser pour debug (tu peux le désactiver en prod)
-      const debug = new THREE.Mesh(
-        new THREE.BoxGeometry(
-          wallData.size.width,
-          wallData.size.height,
-          wallData.size.depth
-        ),
-        new THREE.MeshBasicMaterial({
-          color: 0xff0000,
-          transparent: true,
-          opacity: 0.2,
-        })
-      );
-      debug.position.copy(wallData.position);
-      if (wallData.rotation) {
-        debug.rotation.copy(wallData.rotation);
-      }
-      this.scene.add(debug);
+      // // ✅ Visualiser pour debug (tu peux le désactiver en prod)
+      // const debug = new THREE.Mesh(
+      //   new THREE.BoxGeometry(
+      //     wallData.size.width,
+      //     wallData.size.height,
+      //     wallData.size.depth
+      //   ),
+      //   new THREE.MeshBasicMaterial({
+      //     color: 0xff0000,
+      //     transparent: true,
+      //     opacity: 0.2,
+      //   })
+      // );
+      // debug.position.copy(wallData.position);
+      // if (wallData.rotation) {
+      //   debug.rotation.copy(wallData.rotation);
+      // }
+      // this.scene.add(debug);
     });
 
     // Création du cube pour test
@@ -370,34 +370,34 @@ export class App {
 
     // Stats et GUI
     this.stats = new Stats();
-    this.stats.showPanel(0);
-    document.body.appendChild(this.stats.dom);
-    this.gui = new GUI();
-    this.carControls.setupGUI(this.gui);
+    //this.stats.showPanel(0);
+    //document.body.appendChild(this.stats.dom);
+    // this.gui = new GUI();
+    // this.carControls.setupGUI(this.gui);
 
-    const cameraFolder = this.gui.addFolder("Camera Follow");
-    cameraFolder
-      .add(this.cameraParams, "offsetX", -10, 10, 0.1)
-      .name("Offset X");
-    cameraFolder
-      .add(this.cameraParams, "offsetY", -10, 10, 0.1)
-      .name("Offset Y");
-    cameraFolder
-      .add(this.cameraParams, "offsetZ", -20, 0, 0.1)
-      .name("Offset Z");
-    cameraFolder
-      .add(this.cameraParams, "smoothFactor", 0, 1, 0.01)
-      .name("Smooth Factor");
-    cameraFolder
-      .add(this.cameraParams, "lookAtOffsetY", -10, 10, 0.1)
-      .name("LookAt Offset Y");
-    cameraFolder.open();
+    // const cameraFolder = this.gui.addFolder("Camera Follow");
+    // cameraFolder
+    //   .add(this.cameraParams, "offsetX", -10, 10, 0.1)
+    //   .name("Offset X");
+    // cameraFolder
+    //   .add(this.cameraParams, "offsetY", -10, 10, 0.1)
+    //   .name("Offset Y");
+    // cameraFolder
+    //   .add(this.cameraParams, "offsetZ", -20, 0, 0.1)
+    //   .name("Offset Z");
+    // cameraFolder
+    //   .add(this.cameraParams, "smoothFactor", 0, 1, 0.01)
+    //   .name("Smooth Factor");
+    // cameraFolder
+    //   .add(this.cameraParams, "lookAtOffsetY", -10, 10, 0.1)
+    //   .name("LookAt Offset Y");
+    // cameraFolder.open();
 
-    const carFolder = this.gui.addFolder("Car Position");
-    carFolder.add(this.carPositionDisplay, "x").listen().name("X");
-    carFolder.add(this.carPositionDisplay, "y").listen().name("Y");
-    carFolder.add(this.carPositionDisplay, "z").listen().name("Z");
-    carFolder.open();
+    // const carFolder = this.gui.addFolder("Car Position");
+    // carFolder.add(this.carPositionDisplay, "x").listen().name("X");
+    // carFolder.add(this.carPositionDisplay, "y").listen().name("Y");
+    // carFolder.add(this.carPositionDisplay, "z").listen().name("Z");
+    // carFolder.open();
 
     window.addEventListener("resize", this.onWindowResize.bind(this));
     // Lancement de l'animation
