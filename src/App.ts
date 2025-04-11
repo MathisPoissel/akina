@@ -23,6 +23,11 @@ interface CameraFollowParams {
   lookAtOffsetY: number;
 }
 
+interface DynamicSpot {
+  spot: THREE.SpotLight;
+  position: THREE.Vector3;
+}
+
 export class App {
   private physicsWorld!: CANNON.World;
   private scene!: THREE.Scene;
@@ -58,29 +63,14 @@ export class App {
     lookAtOffsetY: 2.5,
   };
 
+  private dynamicSpots: DynamicSpot[] = [];
+
   async init() {
     // Initialisation de la scène, caméra, renderer...
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x202020);
 
     this.initPhysics();
-
-    this.loadingManager = new THREE.LoadingManager();
-
-    this.loadingManager.onStart = () => {
-      const loader = document.getElementById("loader");
-      if (loader) loader.style.display = "flex";
-    };
-
-    this.loadingManager.onProgress = (url, loaded, total) => {
-      const text = document.getElementById("loader-text");
-      if (text) text.textContent = `Chargement... ${loaded}/${total}`;
-    };
-
-    this.loadingManager.onLoad = () => {
-      const loader = document.getElementById("loader");
-      if (loader) loader.style.display = "none";
-    };
 
     // Création du debugger après l'initialisation du physicsWorld
     // this.cannonDebugger = CannonDebugger(this.scene, this.physicsWorld, {
@@ -191,11 +181,9 @@ export class App {
         0.3,
         2
       );
-
       spot.position.copy(lightData.position);
       spot.castShadow = true;
 
-      // Target personnalisée depuis ton config
       const target = new THREE.Object3D();
       target.position.copy(lightData.target);
       this.scene.add(target);
@@ -203,13 +191,7 @@ export class App {
 
       this.scene.add(spot);
 
-      // Debug optionnel : visualiser la target
-      const targetMarker = new THREE.Mesh(
-        new THREE.SphereGeometry(0.05, 6, 6),
-        new THREE.MeshBasicMaterial({ color: 0xff0000 })
-      );
-      targetMarker.position.copy(lightData.target);
-      this.scene.add(targetMarker);
+      this.dynamicSpots.push({ spot, position: lightData.position.clone() });
     });
 
     this.barrels = [
@@ -345,6 +327,14 @@ export class App {
     this.animate();
   }
 
+  private isNear(
+    pos1: THREE.Vector3,
+    pos2: THREE.Vector3,
+    threshold = 30
+  ): boolean {
+    return pos1.distanceTo(pos2) < threshold;
+  }
+
   animate = () => {
     requestAnimationFrame(this.animate);
     this.stats.begin();
@@ -362,6 +352,13 @@ export class App {
     }
 
     if (this.car?.pivot) {
+      const carPos = this.car.pivot.position;
+
+      // Mettez à jour la visibilité des spots
+      this.dynamicSpots.forEach(({ spot, position }) => {
+        spot.visible = this.isNear(carPos, position, 30);
+      });
+
       this.carPositionDisplay.x = this.car.pivot.position.x.toFixed(2);
       this.carPositionDisplay.y = this.car.pivot.position.y.toFixed(2);
       this.carPositionDisplay.z = this.car.pivot.position.z.toFixed(2);
