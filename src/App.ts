@@ -9,6 +9,10 @@ import { Cube } from "./objects/Cube";
 import { CarControls } from "./controls/CarControls";
 import { Ramp } from "./objects/Ramp";
 import { RoadSegment } from "./objects/Roads/RoadSegment";
+import { CurvedRoad } from "./objects/Roads/CurvedRoad";
+import { GLTFCircuit } from "./objects/Circuits/GLTFCircuit";
+import { circuitLights } from "./objects/Circuits/CircuitLights";
+import { circuitWalls } from "./objects/Circuits/CircuitWalls";
 
 interface CameraFollowParams {
   offsetX: number;
@@ -33,14 +37,22 @@ export class App {
   private cube!: Cube;
   private carControls!: CarControls;
   private roadSegment!: RoadSegment;
+  private curvedRoad!: CurvedRoad;
+  private gltfCircuit!: GLTFCircuit;
+  // Car position
+  private carPositionDisplay = {
+    x: 0,
+    y: 0,
+    z: 0,
+  };
 
   // Paramètres pour le suivi de la caméra
   private cameraParams: CameraFollowParams = {
     offsetX: 0,
-    offsetY: 1.6,
-    offsetZ: -3.2,
-    smoothFactor: 0.1,
-    lookAtOffsetY: 1.1,
+    offsetY: 10,
+    offsetZ: 0,
+    smoothFactor: 1,
+    lookAtOffsetY: 2.5,
   };
 
   async init() {
@@ -51,17 +63,17 @@ export class App {
     this.initPhysics();
 
     // Création du debugger après l'initialisation du physicsWorld
-    this.cannonDebugger = CannonDebugger(this.scene, this.physicsWorld, {
-      color: 0xff0000,
-    });
+    // this.cannonDebugger = CannonDebugger(this.scene, this.physicsWorld, {
+    //   color: 0xff0000,
+    // });
 
-    const debugGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const debugMaterial = new THREE.MeshBasicMaterial({
-      color: 0xff0000,
-      wireframe: true,
-    });
-    const debugMesh = new THREE.Mesh(debugGeometry, debugMaterial);
-    this.scene.add(debugMesh);
+    // const debugGeometry = new THREE.BoxGeometry(1, 1, 1);
+    // const debugMaterial = new THREE.MeshBasicMaterial({
+    //   color: 0xff0000,
+    //   wireframe: true,
+    // });
+    // const debugMesh = new THREE.Mesh(debugGeometry, debugMaterial);
+    // this.scene.add(debugMesh);
 
     this.camera = new THREE.PerspectiveCamera(
       75,
@@ -76,11 +88,64 @@ export class App {
     this.renderer.shadowMap.enabled = true;
     document.body.appendChild(this.renderer.domElement);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-    this.scene.add(ambient);
+    // const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+    // this.scene.add(ambient);
 
     // Création du sol
     //this.floor = new Floor(this.scene, this.physicsWorld);
+
+    circuitWalls.forEach((wallData) => {
+      // ✅ Shape physique
+      const shape = new CANNON.Box(
+        new CANNON.Vec3(
+          wallData.size.width / 2,
+          wallData.size.height / 2,
+          wallData.size.depth / 2
+        )
+      );
+
+      const body = new CANNON.Body({
+        mass: 0,
+        shape,
+        position: new CANNON.Vec3(
+          wallData.position.x,
+          wallData.position.y,
+          wallData.position.z
+        ),
+      });
+
+      // Si rotation est définie (optionnelle)
+      if (wallData.rotation) {
+        const quat = new CANNON.Quaternion();
+        quat.setFromEuler(
+          wallData.rotation.x,
+          wallData.rotation.y,
+          wallData.rotation.z
+        );
+        body.quaternion.copy(quat);
+      }
+
+      this.physicsWorld.addBody(body);
+
+      // ✅ Visualiser pour debug (tu peux le désactiver en prod)
+      const debug = new THREE.Mesh(
+        new THREE.BoxGeometry(
+          wallData.size.width,
+          wallData.size.height,
+          wallData.size.depth
+        ),
+        new THREE.MeshBasicMaterial({
+          color: 0xff0000,
+          transparent: true,
+          opacity: 0.2,
+        })
+      );
+      debug.position.copy(wallData.position);
+      if (wallData.rotation) {
+        debug.rotation.copy(wallData.rotation);
+      }
+      this.scene.add(debug);
+    });
 
     // Création du cube pour test
     this.cube = new Cube(this.scene, this.physicsWorld);
@@ -89,31 +154,116 @@ export class App {
     this.car = new Car(this.scene, this.physicsWorld);
     this.carControls = new CarControls(this.car);
 
-    this.roadSegment = new RoadSegment(
-      this.scene,
-      this.physicsWorld,
-      new THREE.Vector3(0, -2, 0)
-    );
+    // this.curvedRoad = new CurvedRoad(this.scene, this.physicsWorld);
 
-    this.roadSegment = new RoadSegment(
-      this.scene,
-      this.physicsWorld,
-      new THREE.Vector3(0, -2, 20)
-    );
+    this.gltfCircuit = new GLTFCircuit(this.scene, this.physicsWorld);
+
+    circuitLights.forEach((lightData) => {
+      const spot = new THREE.SpotLight(
+        lightData.color || 0xffffff,
+        lightData.intensity || 2,
+        20,
+        Math.PI / 6,
+        0.3,
+        2
+      );
+
+      spot.position.copy(lightData.position);
+      spot.castShadow = true;
+
+      // Target personnalisée depuis ton config
+      const target = new THREE.Object3D();
+      target.position.copy(lightData.target);
+      this.scene.add(target);
+      spot.target = target;
+
+      this.scene.add(spot);
+
+      // Optionnel : Visualiser l’ampoule
+      const bulb = new THREE.Mesh(
+        new THREE.SphereGeometry(0.1, 8, 8),
+        new THREE.MeshBasicMaterial({ color: lightData.color || 0xffffff })
+      );
+      bulb.position.copy(lightData.position);
+      this.scene.add(bulb);
+
+      // Debug optionnel : visualiser la target
+      const targetMarker = new THREE.Mesh(
+        new THREE.SphereGeometry(0.05, 6, 6),
+        new THREE.MeshBasicMaterial({ color: 0xff0000 })
+      );
+      targetMarker.position.copy(lightData.target);
+      this.scene.add(targetMarker);
+    });
+
+    // this.roadSegment = new RoadSegment(
+    //   this.scene,
+    //   this.physicsWorld,
+    //   new THREE.Vector3(0, -2, 0)
+    // );
+
+    // this.roadSegment = new RoadSegment(
+    //   this.scene,
+    //   this.physicsWorld,
+    //   new THREE.Vector3(0, -2, 20)
+    // );
 
     // Création de la rampe
-    const rampPosition = new THREE.Vector3(0, -1.5, 10);
-    const rampWidth = 5;
-    const rampHeight = 0.5;
-    const rampDepth = 10;
-    const ramp = new Ramp(
-      this.scene,
-      this.physicsWorld,
-      rampPosition,
-      rampWidth,
-      rampHeight,
-      rampDepth
-    );
+    // const rampPosition = new THREE.Vector3(0, -1.5, 10);
+    // const rampWidth = 5;
+    // const rampHeight = 0.5;
+    // const rampDepth = 10;
+    // const ramp = new Ramp(
+    //   this.scene,
+    //   this.physicsWorld,
+    //   rampPosition,
+    //   rampWidth,
+    //   rampHeight,
+    //   rampDepth
+    // );
+
+    const skyGeo = new THREE.SphereGeometry(500, 32, 15);
+    const skyMat = new THREE.ShaderMaterial({
+      uniforms: {
+        topColor: { value: new THREE.Color(0xffaadd) },
+        bottomColor: { value: new THREE.Color(0x5f4b8b) },
+        offset: { value: 33 },
+        exponent: { value: 0.6 },
+      },
+      vertexShader: `
+        varying vec3 vWorldPosition;
+        void main() {
+          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+          vWorldPosition = worldPosition.xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 bottomColor;
+        uniform float offset;
+        uniform float exponent;
+        varying vec3 vWorldPosition;
+    
+        void main() {
+          float h = normalize(vWorldPosition + offset).y;
+          gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+        }
+      `,
+      side: THREE.BackSide,
+    });
+
+    const sky = new THREE.Mesh(skyGeo, skyMat);
+    this.scene.add(sky);
+
+    const sunsetLight = new THREE.DirectionalLight(0xffa070, 0.5); // lumière orangée
+    sunsetLight.position.set(-20, 10, -10); // angle rasant
+    sunsetLight.castShadow = true;
+    this.scene.add(sunsetLight);
+
+    // Optionnel : lumière d’ambiance très douce rosée
+    const ambientBis = new THREE.AmbientLight(0xffc2e0, 0.3);
+    this.scene.add(ambientBis);
 
     // Stats et GUI
     this.stats = new Stats();
@@ -140,6 +290,12 @@ export class App {
       .name("LookAt Offset Y");
     cameraFolder.open();
 
+    const carFolder = this.gui.addFolder("Car Position");
+    carFolder.add(this.carPositionDisplay, "x").listen().name("X");
+    carFolder.add(this.carPositionDisplay, "y").listen().name("Y");
+    carFolder.add(this.carPositionDisplay, "z").listen().name("Z");
+    carFolder.open();
+
     window.addEventListener("resize", this.onWindowResize.bind(this));
     // Lancement de l'animation
     this.animate();
@@ -159,6 +315,12 @@ export class App {
     // Met à jour le debugger pour afficher les hitboxes
     if (this.cannonDebugger) {
       this.cannonDebugger.update();
+    }
+
+    if (this.car?.pivot) {
+      this.carPositionDisplay.x = this.car.pivot.position.x.toFixed(2);
+      this.carPositionDisplay.y = this.car.pivot.position.y.toFixed(2);
+      this.carPositionDisplay.z = this.car.pivot.position.z.toFixed(2);
     }
 
     // Mise à jour des contrôles de la voiture

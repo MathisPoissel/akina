@@ -25,7 +25,7 @@ export class Car {
 
   // Paramètres configurables
   private maxSteerValue: number = 0.7; // Valeur de braquage maximale
-  private maxForce: number = 30000; // Force maximale
+  private maxForce: number = 40000; // Force maximale
   private brakeForce: number = 50; // Force de freinage
 
   // Current speed for display
@@ -33,10 +33,10 @@ export class Car {
 
   // Wheel positions
   private wheelPositions = [
-    { x: 0.35, y: -0.17, z: 0.6 }, // Front left
-    { x: -0.35, y: -0.17, z: 0.6 }, // Front right
-    { x: 0.35, y: -0.17, z: -0.5 }, // Back left
-    { x: -0.35, y: -0.17, z: -0.5 }, // Back right
+    { x: 0.35, y: 0, z: 0.6 }, // Front left
+    { x: -0.35, y: 0, z: 0.6 }, // Front right
+    { x: 0.35, y: 0, z: -0.5 }, // Back left
+    { x: -0.35, y: 0, z: -0.5 }, // Back right
   ];
 
   constructor(scene: THREE.Scene, physicsWorld: CANNON.World) {
@@ -50,7 +50,7 @@ export class Car {
         this.model = gltf.scene;
         this.model.scale.set(0.005, 0.005, 0.005);
         this.pivot.add(this.model);
-        this.model.position.set(0, -0.25, 0);
+        this.model.position.set(0, -0.13, 0);
 
         // Activer les ombres pour le modèle de la voiture
         this.model.traverse((child) => {
@@ -119,10 +119,10 @@ export class Car {
 
         // Start the car in a stable position
         if (this.chassisBody) {
-          this.chassisBody.position.set(0, 0, 0);
+          this.chassisBody.position.set(-65.0, 0, 45.5);
           this.chassisBody.quaternion.setFromEuler(0, 0, 0);
           this.chassisBody.velocity.set(0, 0, 0);
-          this.chassisBody.angularVelocity.set(0, 0, 0);
+          this.chassisBody.angularVelocity.set(0, -3.5, 0);
         }
 
         // Create headlights
@@ -253,17 +253,20 @@ export class Car {
     //   indices ? Array.from(indices) : [] // Fallback to an empty array if indices is undefined
     // );
 
-    const chassisShape = new CANNON.Box(new CANNON.Vec3(0.38, 0.1, 0.9));
+    const chassisShape = new CANNON.Box(new CANNON.Vec3(0.38, 0.14, 0.9));
 
     // Créer le corps physique
     const mass = 3000; // Masse réduite pour la stabilité
     this.chassisBody = new CANNON.Body({ mass: mass });
-    this.chassisBody.addShape(chassisShape);
+    this.chassisBody.addShape(
+      chassisShape,
+      new CANNON.Vec3(0, 0.2, 0) // déplace le shape vers le haut dans le body
+    );
 
     // Positionner le châssis au-dessus du sol
     this.chassisBody.position.set(
       this.pivot.position.x,
-      this.pivot.position.y + 1, // Ajustez la position selon vos besoins
+      this.pivot.position.y + 0.3,
       this.pivot.position.z
     );
 
@@ -276,9 +279,9 @@ export class Car {
     // Créer le véhicule
     this.vehicle = new CANNON.RaycastVehicle({
       chassisBody: this.chassisBody,
-      indexRightAxis: 0, // Axe X
-      indexUpAxis: 1, // Axe Y (vertical)
-      indexForwardAxis: 2, // Axe Z (avant)
+      indexRightAxis: 0, // X
+      indexUpAxis: 1, // Y
+      indexForwardAxis: 2, // Z
     });
   }
   private setupWheels(physicsWorld: CANNON.World): void {
@@ -286,18 +289,18 @@ export class Car {
 
     // Wheel options (ajustez le radius selon vos besoins)
     const wheelOptions = {
-      radius: 0.19, // Réduisez cette valeur pour correspondre à l'échelle correcte
-      directionLocal: new CANNON.Vec3(0, -1, 0), // Down direction
-      suspensionStiffness: 23,
-      suspensionRestLength: 0.1,
-      frictionSlip: 1.5,
-      dampingRelaxation: 10,
-      dampingCompression: 2.5,
-      maxSuspensionForce: 80000,
+      radius: 0.19,
+      directionLocal: new CANNON.Vec3(0, -1, 0),
+      suspensionStiffness: 40, // Augmenter la rigidité de la suspension pour une meilleure stabilité
+      suspensionRestLength: 0.05,
+      frictionSlip: 3,
+      dampingRelaxation: 12,
+      dampingCompression: 4,
+      maxSuspensionForce: 100000,
       rollInfluence: 0.05,
       axleLocal: new CANNON.Vec3(1, 0, 0),
       chassisConnectionPointLocal: new CANNON.Vec3(0, 0, 0),
-      maxSuspensionTravel: 5,
+      maxSuspensionTravel: 1,
       customSlidingRotationalSpeed: 0,
       useCustomSlidingRotationalSpeed: true,
     };
@@ -482,6 +485,44 @@ export class Car {
     rightTarget.position.set(-0.25, 0, 2); // Position initiale de la cible (avant de la voiture)
     this.pivot.add(rightTarget); // Ajouter la cible à la voiture
     rightHeadlight.target = rightTarget; // Associer le phare droit à la cible
+
+    // BAck Light
+    const leftBackHeadlight = new THREE.SpotLight(
+      0xff0000, // rouge
+      10, // intensité réduite
+      1.1, // portée (distance)
+      Math.PI / 8, // angle plus étroit
+      0.2, // penumbra (bord doux)
+      1 // decay (diminution de la lumière avec la distance)
+    );
+    leftBackHeadlight.position.set(0.2, 0.25, -0.18); // position arrière
+    leftBackHeadlight.castShadow = false; // pas besoin d’ombres ici
+    this.pivot.add(leftBackHeadlight);
+
+    // Cible
+    const leftBackTarget = new THREE.Object3D();
+    leftBackTarget.position.set(0.2, 0, -2); // regarde vers l’arrière
+    this.pivot.add(leftBackTarget);
+    leftBackHeadlight.target = leftBackTarget;
+
+    // BAck Light
+    const rightBackHeadlight = new THREE.SpotLight(
+      0xff0000, // rouge
+      10, // intensité réduite
+      1.1, // portée (distance)
+      Math.PI / 8, // angle plus étroit
+      0.2, // penumbra (bord doux)
+      1 // decay (diminution de la lumière avec la distance)
+    );
+    rightBackHeadlight.position.set(-0.2, 0.25, -0.18); // position arrière
+    rightBackHeadlight.castShadow = false; // pas besoin d’ombres ici
+    this.pivot.add(rightBackHeadlight);
+
+    // Cible
+    const rightBackTarget = new THREE.Object3D();
+    rightBackTarget.position.set(-0.2, 0, -2); // regarde vers l’arrière
+    this.pivot.add(rightBackTarget);
+    rightBackHeadlight.target = rightBackTarget;
   }
 
   private updateHeadlights(): void {
