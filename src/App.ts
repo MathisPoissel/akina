@@ -14,6 +14,7 @@ import { GLTFCircuit } from "./objects/Circuits/GLTFCircuit";
 import { circuitLights } from "./objects/Circuits/CircuitLights";
 import { circuitWalls } from "./objects/Circuits/CircuitWalls";
 import { Barrel } from "./objects/Circuits/Barrels";
+import { checkpoints, Checkpoint } from "./objects/Circuits/Checkpoints";
 
 interface CameraFollowParams {
   offsetX: number;
@@ -53,7 +54,31 @@ export class App {
     z: 0,
   };
   private barrels!: Barrel;
+  private countdownActive: boolean = true;
+  private timerStartTime: number | null = null;
+  private raceTimerEl: HTMLElement | null = null;
+  private finishLineBody!: CANNON.Body;
+  private finishTriggered: boolean = false;
+  private checkpoints: Checkpoint[] = checkpoints;
 
+  private async startCountdown(): Promise<void> {
+    const countdownEl = document.getElementById("countdown")!;
+    const textEl = document.getElementById("countdown-text")!;
+    const steps = ["3", "2", "1"];
+
+    countdownEl.style.display = "flex";
+
+    for (let step of steps) {
+      textEl.textContent = step;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    countdownEl.style.display = "none";
+
+    this.timerStartTime = performance.now();
+    this.raceTimerEl = document.getElementById("race-timer");
+    if (this.raceTimerEl) this.raceTimerEl.style.display = "block";
+  }
   // Paramètres pour le suivi de la caméra
   private cameraParams: CameraFollowParams = {
     offsetX: 0,
@@ -71,6 +96,58 @@ export class App {
     this.scene.background = new THREE.Color(0x202020);
 
     this.initPhysics();
+
+    this.loadingManager = new THREE.LoadingManager();
+
+    this.loadingManager.onStart = () => {
+      const loader = document.getElementById("loader");
+      if (loader) loader.style.display = "flex";
+    };
+
+    this.loadingManager.onProgress = (url, loaded, total) => {
+      const text = document.getElementById("loader-text");
+      if (text) text.textContent = `Chargement... ${loaded}/${total}`;
+    };
+
+    this.loadingManager.onLoad = async () => {
+      const loader = document.getElementById("loader");
+      if (loader) loader.style.display = "none";
+
+      // 👉 Lance le décompte une fois le modèle chargé
+      await this.startCountdown();
+      this.countdownActive = false; // autoriser les contrôles
+      this.timerStartTime = performance.now();
+    };
+
+    // ✅ Ligne d’arrivée bien alignée avec le mesh de debug
+    const size = new THREE.Vector3(8, 4, 8); // Dimensions finales
+    const rotationY = Math.PI / 4; // 45° rotation
+
+    // Boîte Cannon
+    const finishShape = new CANNON.Box(new CANNON.Vec3(size.x, size.y, size.z));
+    this.finishLineBody = new CANNON.Body({
+      mass: 0,
+      type: CANNON.Body.STATIC,
+    });
+    this.finishLineBody.addShape(finishShape);
+    this.finishLineBody.position.set(-68.1, -1, 44.5);
+    this.finishLineBody.quaternion.setFromEuler(0, rotationY, 0);
+    this.finishLineBody.collisionResponse = false;
+    this.physicsWorld.addBody(this.finishLineBody);
+
+    //Checkpoint :
+    this.checkpoints.forEach((cp) => {
+      const debugSphere = new THREE.Mesh(
+        new THREE.SphereGeometry(cp.radius, 8, 8),
+        new THREE.MeshBasicMaterial({
+          color: 0x00ff00,
+          transparent: true,
+          opacity: 0.2,
+        })
+      );
+      debugSphere.position.copy(cp.position);
+      this.scene.add(debugSphere);
+    });
 
     // Création du debugger après l'initialisation du physicsWorld
     // this.cannonDebugger = CannonDebugger(this.scene, this.physicsWorld, {
@@ -364,11 +441,61 @@ export class App {
       this.carPositionDisplay.z = this.car.pivot.position.z.toFixed(2);
     }
 
-    // Mise à jour des contrôles de la voiture
-    this.carControls.update(delta);
+    if (!this.countdownActive && !this.finishTriggered) {
+      this.carControls.update(delta);
+    }
 
-    // Mise à jour de la position et rotation de la voiture
-    this.car.update();
+    this.car.update(); // ← maintenant uniquement ici
+
+    if (this.timerStartTime && this.raceTimerEl && !this.finishTriggered) {
+      const elapsed = performance.now() - this.timerStartTime;
+      const minutes = Math.floor(elapsed / 60000);
+      const seconds = Math.floor((elapsed % 60000) / 1000);
+      const milliseconds = Math.floor(elapsed % 1000);
+
+      this.raceTimerEl.textContent = `${String(minutes).padStart(
+        2,
+        "0"
+      )}:${String(seconds).padStart(2, "0")}.${String(milliseconds).padStart(
+        3,
+        "0"
+      )}`;
+    }
+
+    //Gesion des checkpoint :
+
+    // Vérifie les checkpoints
+    this.checkpoints.forEach((cp) => {
+      if (!cp.passed && this.car?.chassisBody) {
+        const carPos = this.car.chassisBody.position;
+        const dist = cp.position.distanceTo(carPos as unknown as THREE.Vector3);
+        if (dist < cp.radius) {
+          cp.passed = true;
+          console.log("✅ Checkpoint passé :", cp.position);
+        }
+      }
+    });
+
+    // ✅ Gestion ligne d'arrivée avec vérification des checkpoints
+    if (!this.finishTriggered && this.car?.chassisBody) {
+      const carPos = this.car.chassisBody.position;
+      const finishPos = this.finishLineBody.position;
+      const distance = carPos.vsub(finishPos).length();
+
+      const allCheckpointsPassed = this.checkpoints.every((cp) => cp.passed);
+
+      if (distance < 2 && allCheckpointsPassed) {
+        this.finishTriggered = true;
+        const finalTimeMs = performance.now() - this.timerStartTime;
+        const seconds = (finalTimeMs / 1000).toFixed(2);
+
+        // Affiche l'écran de fin
+        const endScreen = document.getElementById("end-screen")!;
+        const endTime = document.getElementById("end-time")!;
+        endTime.textContent = `⏱️ Temps final : ${seconds} secondes`;
+        endScreen.style.display = "flex";
+      }
+    }
 
     // Suivi de la caméra
     if (this.car.pivot) {
