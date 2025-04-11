@@ -42,5 +42,35 @@ export const circuitLights: {
     color: 0xffffff,
     intensity: 100,
   },
+  {
+    position: new THREE.Vector3(-61.8, 5, 51.25),
+    target: new THREE.Vector3(-61.8, 1, 47.25),
+    color: 0xffffff,
+    intensity: 100,
+  },
+  {
+    position: new THREE.Vector3(-51.5, 5, 51.25),
+    target: new THREE.Vector3(-51.5, 1, 47.25),
+    color: 0xffffff,
+    intensity: 100,
+  },
+  {
+    position: new THREE.Vector3(-42.15, 5, 51.25),
+    target: new THREE.Vector3(-42.15, 1, 47.25),
+    color: 0xffffff,
+    intensity: 100,
+  },
+  {
+    position: new THREE.Vector3(-32.6, 5, 51.25),
+    target: new THREE.Vector3(-32.6, 1, 47.25),
+    color: 0xffffff,
+    intensity: 100,
+  },
+  {
+    position: new THREE.Vector3(-23.5, 5, 51.25),
+    target: new THREE.Vector3(-23.5, 1, 47.25),
+    color: 0xffffff,
+    intensity: 100,
+  },
   // ajoute autant de spots que nécessaire...
 ];

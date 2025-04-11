@@ -14,6 +14,65 @@
     </style>
   </head>
   <body>
+    <!-- ✅ Place ici ton écran d'accueil -->
+    <div
+      id="start-screen"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(to bottom, #1a1a2e, #2c003e);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        font-family: sans-serif;
+        z-index: 10;
+      "
+    >
+      <h1 style="margin-bottom: 1rem">🏁 AKINA CIRCUIT</h1>
+      <button
+        id="start-button"
+        style="
+          padding: 1rem 2rem;
+          font-size: 1.2rem;
+          border: none;
+          background: #ff66cc;
+          color: white;
+          cursor: pointer;
+          border-radius: 8px;
+        "
+      >
+        JOUER
+      </button>
+    </div>
+
+    <div
+      id="loader"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #111;
+        color: white;
+        font-family: sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        z-index: 15;
+        display: none;
+      "
+    >
+      <div id="loader-text" style="font-size: 1.2rem">Chargement...</div>
+    </div>
+
+    <!-- Ton canvas & scripts -->
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

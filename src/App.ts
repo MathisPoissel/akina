@@ -13,6 +13,7 @@ import { CurvedRoad } from "./objects/Roads/CurvedRoad";
 import { GLTFCircuit } from "./objects/Circuits/GLTFCircuit";
 import { circuitLights } from "./objects/Circuits/CircuitLights";
 import { circuitWalls } from "./objects/Circuits/CircuitWalls";
+import { Barrel } from "./objects/Circuits/Barrels";
 
 interface CameraFollowParams {
   offsetX: number;
@@ -39,12 +40,14 @@ export class App {
   private roadSegment!: RoadSegment;
   private curvedRoad!: CurvedRoad;
   private gltfCircuit!: GLTFCircuit;
+  private loadingManager: THREE.LoadingManager;
   // Car position
   private carPositionDisplay = {
     x: 0,
     y: 0,
     z: 0,
   };
+  private barrels!: Barrel;
 
   // Paramètres pour le suivi de la caméra
   private cameraParams: CameraFollowParams = {
@@ -61,6 +64,23 @@ export class App {
     this.scene.background = new THREE.Color(0x202020);
 
     this.initPhysics();
+
+    this.loadingManager = new THREE.LoadingManager();
+
+    this.loadingManager.onStart = () => {
+      const loader = document.getElementById("loader");
+      if (loader) loader.style.display = "flex";
+    };
+
+    this.loadingManager.onProgress = (url, loaded, total) => {
+      const text = document.getElementById("loader-text");
+      if (text) text.textContent = `Chargement... ${loaded}/${total}`;
+    };
+
+    this.loadingManager.onLoad = () => {
+      const loader = document.getElementById("loader");
+      if (loader) loader.style.display = "none";
+    };
 
     // Création du debugger après l'initialisation du physicsWorld
     // this.cannonDebugger = CannonDebugger(this.scene, this.physicsWorld, {
@@ -156,7 +176,11 @@ export class App {
 
     // this.curvedRoad = new CurvedRoad(this.scene, this.physicsWorld);
 
-    this.gltfCircuit = new GLTFCircuit(this.scene, this.physicsWorld);
+    this.gltfCircuit = new GLTFCircuit(
+      this.scene,
+      this.physicsWorld,
+      this.loadingManager
+    );
 
     circuitLights.forEach((lightData) => {
       const spot = new THREE.SpotLight(
@@ -179,14 +203,6 @@ export class App {
 
       this.scene.add(spot);
 
-      // Optionnel : Visualiser l’ampoule
-      const bulb = new THREE.Mesh(
-        new THREE.SphereGeometry(0.1, 8, 8),
-        new THREE.MeshBasicMaterial({ color: lightData.color || 0xffffff })
-      );
-      bulb.position.copy(lightData.position);
-      this.scene.add(bulb);
-
       // Debug optionnel : visualiser la target
       const targetMarker = new THREE.Mesh(
         new THREE.SphereGeometry(0.05, 6, 6),
@@ -195,6 +211,34 @@ export class App {
       targetMarker.position.copy(lightData.target);
       this.scene.add(targetMarker);
     });
+
+    this.barrels = [
+      new Barrel(
+        this.scene,
+        this.physicsWorld,
+        new THREE.Vector3(-99.5, 0, -23)
+      ),
+      new Barrel(
+        this.scene,
+        this.physicsWorld,
+        new THREE.Vector3(-101.5, 0, -23)
+      ),
+      new Barrel(
+        this.scene,
+        this.physicsWorld,
+        new THREE.Vector3(-103.5, 0, -23)
+      ),
+      new Barrel(
+        this.scene,
+        this.physicsWorld,
+        new THREE.Vector3(-100.5, 0, -25)
+      ),
+      new Barrel(
+        this.scene,
+        this.physicsWorld,
+        new THREE.Vector3(-102.5, 0, -25)
+      ),
+    ];
 
     // this.roadSegment = new RoadSegment(
     //   this.scene,
@@ -337,21 +381,30 @@ export class App {
       const carWorldQuat = new THREE.Quaternion();
       this.car.pivot.getWorldQuaternion(carWorldQuat);
 
+      // 👉 Offset caméra (toujours relatif à la voiture)
       const offset = new THREE.Vector3(
         this.cameraParams.offsetX,
         this.cameraParams.offsetY,
-        this.cameraParams.offsetZ
+        this.cameraParams.offsetZ + 3
       );
       offset.applyQuaternion(carWorldQuat);
 
+      // ✅ Position caméra interpolée
       const desiredPos = carWorldPos.clone().add(offset);
       this.camera.position.lerp(desiredPos, this.cameraParams.smoothFactor);
 
-      const lookAtTarget = carWorldPos.clone();
-      lookAtTarget.y += this.cameraParams.lookAtOffsetY;
+      // 🎯 Créer un point devant la voiture pour le regard
+      const lookAhead = new THREE.Vector3(0, 0, 3); // -Z = devant la voiture
+      lookAhead.applyQuaternion(carWorldQuat); // on applique l'orientation
+      const lookAtTarget = carWorldPos.clone().add(lookAhead); // vers l’avant
+
+      lookAtTarget.y += this.cameraParams.lookAtOffsetY; // petit offset vertical si tu veux
+
       this.camera.lookAt(lookAtTarget);
     }
     this.cube.update();
+
+    this.barrels.forEach((barrel) => barrel.update());
 
     this.renderer.render(this.scene, this.camera);
     this.stats.end();

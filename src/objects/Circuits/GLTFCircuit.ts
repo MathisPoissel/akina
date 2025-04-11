@@ -6,10 +6,11 @@ export class GLTFCircuit {
   constructor(
     scene: THREE.Scene,
     physicsWorld: CANNON.World,
+    loadingManager: THREE.LoadingManager,
     path: string = "/models/gltf/circuit/scene.gltf",
     position: THREE.Vector3 = new THREE.Vector3(-25, -6.4, -30)
   ) {
-    const loader = new GLTFLoader();
+    const loader = new GLTFLoader(loadingManager);
 
     loader.load(path, (gltf) => {
       const model = gltf.scene;
